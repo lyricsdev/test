@@ -84,7 +84,7 @@ await ( await fetch("https://АДРЕС/api/admin/action/disapprove, {
     "Content-Type": "application/json"
   }
 }) ).json()
-
+```
 - `/api/getsuggestions` Возращает список всех предложений по кол-ву голосов в убывающем порядке.
 ```javascript
 await ( await fetch("https://АДРЕС/api/getsuggestions, {
