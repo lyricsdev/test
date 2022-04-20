@@ -1,7 +1,14 @@
 const requestIp = require('request-ip');
 const {getRequestIpAddress} = require('./request_ip_address');
 const db = require("./db.model");
-
+const { user, madesugg } = require('./db.model');
+const moment = require('moment') //<es6
+const Sequelize = require('sequelize');
+const op = Sequelize.Op;
+const operatorsAliases = {
+    $eq: op.eq,
+    $or: op.or,
+}
 const { suggestion: Suggestion} = db;
 const { votes: Votes} = db;
 const { madesugg: Madesugg} = db;
@@ -23,41 +30,62 @@ module.exports = function(app) {
     });
     app.post("/api/makesuggestion",(req, res, next) => {
         const ip = getRequestIpAddress(req);
-
-        Madesugg.findall({
-            where: { 
-                distinct: ip,
+        User.findOne({
+            where: {
+              ip: ip
             }
-        }).then(function(count) {
-            if(checkonfivetimes(count)) {
-                User.update({
-                    canpublish: false
-                }, {
-                    where: {
-                        ip: ip
-                    }
+          })
+            .then(async (user) => {
+              if (!user) {
+                User.create({
+                    ip: ip,
+                    canvote: true
+                }).then(result => {
+                    
                 });
-                res.status(200).json({
-                    message: `You have already made ${count} times a suggestions`,
-                    result: count
-                });
-            } else {
-            const ip = getRequestIpAddress(req);
-            const {title, content} = req.body;
-            Suggestion.create({
-                title,
-                content,
-                ip
-            }).then(result => {
+              }
+              Madesugg.count({
+                where: {
+                    ip: ip,
+                },
+                createdAt: {
+                    [op.gte]: Sequelize.literal('NOW() - INTERVAL "1d"'),
+                  }
+            }).then(function(count) {
+                if(checkonfivetimes(count)) {
+                    User.update({
+                        canpublish: false
+                    }, {
+                        where: {
+                            ip: ip
+                        }
+                    });
+                    res.status(200).json({
+                        message: "You have already created 5 times",
+                        result: count
+                    });
+                } else {
+                  Suggestion.create({
+                    ip: ip,
+                    content: req.body.content,
+                    title: req.body.title
 
-                res.status(200).json({
-                    message: "Suggestion added successfully",
-                    result: result
-                });
+                    }).then(result => {
+                        Madesugg.create({
+                            ip: ip,
+                            madedsugg: result.id
+                        });
+
+                        res.status(200).json({
+                            message: "Suggestion created successfully",
+                            result: result
+                        });
+                    });
+                }
             });
-        }
-        });
+            });
 
+    
     });
     app.post("/api/getsuggestions",(req, res, next) =>  {
             Suggestion.findAll({
@@ -73,10 +101,135 @@ module.exports = function(app) {
         });
     app.post("/api/addvote",(req, res, next) => {
         const ip = getRequestIpAddress(req);
-        Votes.findall({
+        User.findOne({
             where: {
-                distinct: ip,
+              ip: ip
             }
+          })
+            .then(async (user) => {
+              if (!user) {
+                User.create({
+                    ip: ip,
+                    canvote: true
+                }).then(result => {
+                    Votes.count({
+                        where: {
+                            ip: ip,
+                        }
+                    }).then(function(count) {
+                        if(checkonfivetimes(count)) {
+                            User.update({
+                                canvote: false
+                            }, {
+                                where: {
+                                    ip: ip
+                                }
+                            });
+                            res.status(200).json({
+                                message: "You have already voted 5 times",
+                                result: count
+                            });
+                        } else {
+                            const {id} = req.body;
+                            Suggestion.findOne({
+                                where: {
+                                    id
+                                }
+                            }).then(result => {
+                                if(result) {
+                                    Suggestion.update({
+                                        votes: result.votes + 1
+                                    }, {
+                                        where: {
+                                            id
+                                        }
+                                    }).then(result => {
+                                        Votes.create({
+                                            ip : ip,
+                                            suggestionId: req.body.id
+                                        });
+                                        res.status(200).json({
+                                            message: "Vote added successfully",
+                                            result: result
+                                        });
+                                    });
+                                } else {
+                                    res.status(200).json({
+                                        message: "Suggestion not found",
+                                        result: result
+                                    });
+                                }
+                            });
+                        }
+                    });
+                });
+              }
+              Votes.count({
+                where: {
+                    ip: ip,
+                },
+                createdAt: {
+                    [op.gte]: Sequelize.literal('NOW() - INTERVAL "1d"'),
+                  }
+            }).then(function(count) {
+                if(checkonfivetimes(count)) {
+                    User.update({
+                        canvote: false
+                    }, {
+                        where: {
+                            ip: ip
+                        }
+                    });
+                    res.status(200).json({
+                        message: "You have already voted 5 times",
+                        result: count
+                    });
+                } else {
+                    const {id} = req.body;
+                    Suggestion.findOne({
+                        where: {
+                            id
+                        }
+                    }).then(result => {
+                        if(result) {
+                            Suggestion.update({
+                                votes: result.votes + 1
+                            }, {
+                                where: {
+                                    id
+                                }
+                            }).then(result => {
+                                Votes.create({
+                                    ip : ip,
+                                    suggestionId: req.body.id
+                                });
+                                res.status(200).json({
+                                    message: "Vote added successfully",
+                                    result: result
+                                });
+                            });
+                        } else {
+                            res.status(200).json({
+                                message: "Suggestion not found",
+                                result: result
+                            });
+                        }
+                    });
+                }
+            });
+            });
+
+    
+    });
+    app.post("/api/check/votes",(req, res, next) => {
+        const ip = getRequestIpAddress(req);
+        Votes.count({
+            where: {
+                ip: ip,
+            },
+            createdAt: {
+                [op.gte]: Sequelize.literal('NOW() - INTERVAL "1d"'),
+              }
         }).then(function(count) {
             if(checkonfivetimes(count)) {
                 User.update({
@@ -86,50 +239,6 @@ module.exports = function(app) {
                         ip: ip
                     }
                 });
-                res.status(200).json({
-                    message: "You have already voted 5 times",
-                    result: count
-                });
-            } else {
-                const {id} = req.body;
-                Suggestion.findOne({
-                    where: {
-                        id
-                    }
-                }).then(result => {
-                    if(result) {
-                        Suggestion.update({
-                            votes: result.votes + 1
-                        }, {
-                            where: {
-                                id
-                            }
-                        }).then(result => {
-                            res.status(200).json({
-                                message: "Vote added successfully",
-                                result: result
-                            });
-                        });
-                    } else {
-                        res.status(200).json({
-                            message: "Suggestion not found",
-                            result: result
-                        });
-                    }
-                });
-            }
-        });
-    
-    });
-    app.post("/api/check/votes",(req, res, next) => {
-        const ip = getRequestIpAddress(req);
-        Votes.findall({
-            where: {
-                distinct: ip,
-            }
-        }).then(function(count) {
-            if(checkonfivetimes(count)) {
-            
                 res.status(200).json({
                     message: `You have already voted ${count} times`,
                     result: 5-count
@@ -159,12 +268,22 @@ module.exports = function(app) {
     });
     app.post("/api/check/suggestion",(req, res, next) => {
         const ip = getRequestIpAddress(req);
-        Madesugg.findall({
+        Madesugg.count({
             where: {
-                distinct: ip,
-            }
+                ip: ip,
+            },
+            createdAt: {
+                [op.gte]: Sequelize.literal('NOW() - INTERVAL "1d"'),
+              }
         }).then(function(count) {
             if(checkonfivetimes(count)) {
+                User.update({
+                    canpublish: false
+                }, {
+                    where: {
+                        ip: ip
+                    }
+                });
                 res.status(200).json({
                     message: `You have already made ${count} times a suggestions`,
                     result: 5-count
