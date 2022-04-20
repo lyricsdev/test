@@ -28,9 +28,18 @@ await ( await fetch("https://АДРЕС/api/addvote", {
   }
 }) ).json()
 ```
-- `/api/ihavevotes` - Получение количество голосований.
+- `/api/check/votes` - Получение оставшихся кол-во голосований на сегодня.
 ```javascript
-await ( await fetch("https://АДРЕС/api/ihavevotes", {
+await ( await fetch("https://АДРЕС/api/check/votes", {
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}) ).json()
+```
+- `/api/check/suggestion` - Получение оставшихся попыток создания предложений на сегодня.
+```javascript
+await ( await fetch("https://АДРЕС/api/check/suggestion", {
   "method": "POST",
   "headers": {
     "Content-Type": "application/json"
@@ -71,6 +80,15 @@ await ( await fetch("https://АДРЕС/api/admin/action/disapprove, {
     "password": "admin",
     "suggestionid": 1
   }),
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}) ).json()
+
+- `/api/getsuggestions` Возращает список всех предложений по кол-ву голосов в убывающем порядке.
+```javascript
+await ( await fetch("https://АДРЕС/api/getsuggestions, {
+  "method": "POST",
   "headers": {
     "Content-Type": "application/json"
   }
