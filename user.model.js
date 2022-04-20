@@ -1,5 +1,5 @@
 module.exports = (sequelize, Sequelize) => {
-    const user = sequelize.define("userj", {
+    const user = sequelize.define("user", {
       id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,

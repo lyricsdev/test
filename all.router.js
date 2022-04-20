@@ -41,7 +41,45 @@ module.exports = function(app) {
                     ip: ip,
                     canvote: true
                 }).then(result => {
-                    
+                    Madesugg.count({
+                        where: {
+                            ip: ip,
+                        },
+                        createdAt: {
+                            [op.gte]: Sequelize.literal('NOW() - INTERVAL "1d"'),
+                          }
+                    }).then(function(count) {
+                        if(checkonfivetimes(count)) {
+                            User.update({
+                                canpublish: false
+                            }, {
+                                where: {
+                                    ip: ip
+                                }
+                            });
+                            res.status(200).json({
+                                message: "You have already created 5 times",
+                                result: count
+                            });
+                        } else {
+                          Suggestion.create({
+                            ip: ip,
+                            content: req.body.content,
+                            title: req.body.title
+        
+                            }).then(result => {
+                                Madesugg.create({
+                                    ip: ip,
+                                    madedsugg: result.id
+                                });
+        
+                                res.status(200).json({
+                                    message: "Suggestion created successfully",
+                                    result: result
+                                });
+                            });
+                        }
+                    });
                 });
               }
               Madesugg.count({
